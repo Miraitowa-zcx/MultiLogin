@@ -1,6 +1,8 @@
 .idea/
+/docs/
 .digests
 /.gradle/
+/buildSrc/
 */build/
 /build/
 /*/*/build/
@@ -9,6 +11,7 @@
 /input/
 /output/
 run/
+/logs/
 fabric/.gradle/*
 fabric/.gradle/
 /.vscode

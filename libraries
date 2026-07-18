@@ -15,3 +15,4 @@ com.squareup.okio        okio-jvm                   3.3.0
 org.jetbrains.kotlin     kotlin-stdlib              1.8.10
 org.jetbrains.kotlin     kotlin-stdlib-common       1.8.10
 com.mojang               brigadier                  1.0.18
+org.postgresql           postgresql                 42.7.13

@@ -1,39 +1,53 @@
 package moe.caa.multilogin.core.database.table;
 
 import moe.caa.multilogin.api.internal.util.Pair;
-import moe.caa.multilogin.core.database.SQLManager;
+import moe.caa.multilogin.core.database.SqlDatabase;
+import moe.caa.multilogin.core.database.SqlDialect;
+import moe.caa.multilogin.core.database.SqlTable;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.MessageFormat;
 
 /**
  * 皮肤修复缓存表
  */
-public class SkinRestoredCacheTableV2 {
+public class SkinRestoredCacheTableV2 implements SqlTable {
     private static final String fieldCurrentSkinUrlSha256 = "current_skin_url_sha256";
     private static final String fieldCurrentSkinModel = "current_skin_model";
     private static final String fieldRestorerValue = "restorer_value";
     private static final String fieldRestorerSignature = "restorer_signature";
-    private final SQLManager sqlManager;
+    private final SqlDatabase database;
     private final String tableName;
 
-    public SkinRestoredCacheTableV2(SQLManager sqlManager, String tableName) {
-        this.sqlManager = sqlManager;
+    public SkinRestoredCacheTableV2(SqlDatabase database, String tableName) {
+        this.database = database;
         this.tableName = tableName;
     }
 
+    @Override
     public void init(Connection connection) throws SQLException {
-        String sql = MessageFormat.format(
-                "CREATE TABLE IF NOT EXISTS {0} ( " +
-                        "{1} BINARY(32) NOT NULL, " +
-                        "{2} VARCHAR(16) NOT NULL, " +
-                        "{3} LONGTEXT NOT NULL, " +
-                        "{4} LONGTEXT NOT NULL, " +
-                        "PRIMARY KEY ( {1}, {2} ))"
-                , tableName, fieldCurrentSkinUrlSha256, fieldCurrentSkinModel, fieldRestorerValue, fieldRestorerSignature);
+        SqlDialect dialect = database.dialect();
+        String digestCheck = dialect.binaryCheck(fieldCurrentSkinUrlSha256, 32);
+        String sql = String.format(
+                "CREATE TABLE IF NOT EXISTS %s ( "
+                        + "%s %s NOT NULL%s, "
+                        + "%s VARCHAR(16) NOT NULL, "
+                        + "%s %s NOT NULL, "
+                        + "%s %s NOT NULL, "
+                        + "PRIMARY KEY ( %s, %s ))",
+                tableName,
+                fieldCurrentSkinUrlSha256,
+                dialect.binaryType(32),
+                digestCheck.isEmpty() ? "" : " " + digestCheck,
+                fieldCurrentSkinModel,
+                fieldRestorerValue,
+                dialect.largeTextType(),
+                fieldRestorerSignature,
+                dialect.largeTextType(),
+                fieldCurrentSkinUrlSha256,
+                fieldCurrentSkinModel);
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
             preparedStatement.executeUpdate();
         }
@@ -51,7 +65,7 @@ public class SkinRestoredCacheTableV2 {
                 "SELECT %s, %s FROM %s WHERE %s = ? AND %s = ? LIMIT 1"
                 , fieldRestorerValue, fieldRestorerSignature, tableName, fieldCurrentSkinUrlSha256, fieldCurrentSkinModel
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, urlSha256);
@@ -78,7 +92,7 @@ public class SkinRestoredCacheTableV2 {
                 "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?) "
                 , tableName, fieldCurrentSkinUrlSha256, fieldCurrentSkinModel, fieldRestorerValue, fieldRestorerSignature
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, urlSha256);

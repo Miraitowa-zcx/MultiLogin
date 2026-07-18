@@ -1,5 +1,6 @@
 package moe.caa.multilogin.core.database.pool;
 
+import moe.caa.multilogin.core.database.SqlDialect;
 import org.h2.jdbcx.JdbcConnectionPool;
 
 import java.io.File;
@@ -30,6 +31,11 @@ public class H2ConnectionPool implements ISQLConnectionPool {
     @Override
     public String name() {
         return "H2";
+    }
+
+    @Override
+    public SqlDialect dialect() {
+        return SqlDialect.H2;
     }
 
     @Override

@@ -6,41 +6,57 @@ import moe.caa.multilogin.api.internal.util.There;
 import moe.caa.multilogin.api.internal.util.ValueUtil;
 import moe.caa.multilogin.core.command.CommandHandler;
 import moe.caa.multilogin.core.configuration.service.BaseServiceConfig;
-import moe.caa.multilogin.core.database.SQLManager;
+import moe.caa.multilogin.core.database.SqlDatabase;
+import moe.caa.multilogin.core.database.SqlDialect;
+import moe.caa.multilogin.core.database.SqlTable;
 
 import java.sql.*;
-import java.text.MessageFormat;
 import java.util.*;
 
 /**
  * 玩家数据表
  */
-public class UserDataTableV3 {
+public class UserDataTableV3 implements SqlTable {
     private static final String fieldOnlineUUID = "online_uuid";
     private static final String fieldOnlineName = "online_name";
     private static final String fieldServiceId = "service_id";
     private static final String fieldInGameProfileUuid = "in_game_profile_uuid";
     private static final String fieldWhitelist = "whitelist";
-    private final SQLManager sqlManager;
+    private final SqlDatabase database;
     private final String tableName;
     private final String tableNameV2;
 
-    public UserDataTableV3(SQLManager sqlManager, String tableName, String tableNameV2) {
-        this.sqlManager = sqlManager;
+    public UserDataTableV3(SqlDatabase database, String tableName, String tableNameV2) {
+        this.database = database;
         this.tableName = tableName;
         this.tableNameV2 = tableNameV2;
     }
 
+    @Override
     public void init(Connection connection) throws SQLException {
-        String sql = MessageFormat.format(
-                "CREATE TABLE IF NOT EXISTS {0} ( " +
-                        "{1} BINARY(16) NOT NULL, " +
-                        "{2} INTEGER NOT NULL, " +
-                        "{3} VARCHAR(64) DEFAULT NULL, " +
-                        "{4} BINARY(16) DEFAULT NULL, " +
-                        "{5} BOOL DEFAULT FALSE, " +
-                        "PRIMARY KEY ( {1}, {2} ))"
-                , tableName, fieldOnlineUUID, fieldServiceId, fieldOnlineName, fieldInGameProfileUuid, fieldWhitelist);
+        SqlDialect dialect = database.dialect();
+        String onlineUuidCheck = dialect.binaryCheck(fieldOnlineUUID, 16);
+        String profileUuidCheck = dialect.binaryCheck(fieldInGameProfileUuid, 16);
+        String sql = String.format(
+                "CREATE TABLE IF NOT EXISTS %s ( "
+                        + "%s %s NOT NULL%s, "
+                        + "%s INTEGER NOT NULL, "
+                        + "%s VARCHAR(64) DEFAULT NULL, "
+                        + "%s %s DEFAULT NULL%s, "
+                        + "%s BOOL DEFAULT FALSE, "
+                        + "PRIMARY KEY ( %s, %s ))",
+                tableName,
+                fieldOnlineUUID,
+                dialect.binaryType(16),
+                onlineUuidCheck.isEmpty() ? "" : " " + onlineUuidCheck,
+                fieldServiceId,
+                fieldOnlineName,
+                fieldInGameProfileUuid,
+                dialect.binaryType(16),
+                profileUuidCheck.isEmpty() ? "" : " " + profileUuidCheck,
+                fieldWhitelist,
+                fieldOnlineUUID,
+                fieldServiceId);
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
             preparedStatement.executeUpdate();
             // 查新表有没有数据，没有的话就尝试一下数据升级
@@ -54,6 +70,9 @@ public class UserDataTableV3 {
                     return;
                 }
             }
+            if (!SqlTableMetadata.tableExists(connection, tableNameV2)) {
+                return;
+            }
             try (
                     PreparedStatement statement = connection.prepareStatement("SELECT COUNT(0) FROM " + tableNameV2);
                     ResultSet resultSet = statement.executeQuery()
@@ -63,9 +82,6 @@ public class UserDataTableV3 {
                     // 老表里面没有数据，不需要升级
                     return;
                 }
-            } catch (Exception ignored) {
-                // 老表不存在，不需要进行升级
-                return;
             }
         }
 
@@ -111,7 +127,7 @@ public class UserDataTableV3 {
                 "SELECT %s, %s, %s FROM %s WHERE %s = ? AND %s = ? LIMIT 1"
                 , fieldOnlineName, fieldInGameProfileUuid, fieldWhitelist, tableName, fieldOnlineUUID, fieldServiceId
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(onlineUUID));
@@ -133,7 +149,7 @@ public class UserDataTableV3 {
                 "SELECT %s FROM %s WHERE lower(%s) = ? AND %s = ? LIMIT 1"
                 , fieldOnlineUUID, tableName, fieldOnlineName, fieldServiceId
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setString(1, username.toLowerCase(Locale.ROOT));
@@ -159,7 +175,7 @@ public class UserDataTableV3 {
                 "SELECT %s FROM %s WHERE %s = ? AND %s = ? LIMIT 1"
                 , fieldInGameProfileUuid, tableName, fieldOnlineUUID, fieldServiceId
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(onlineUUID));
@@ -185,7 +201,7 @@ public class UserDataTableV3 {
                 "SELECT %s FROM %s WHERE %s = ?"
                 , fieldServiceId, tableName, fieldInGameProfileUuid
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(inGameUUID));
@@ -210,7 +226,7 @@ public class UserDataTableV3 {
                 "SELECT %s, %s, %s FROM %s WHERE %s = ?"
                 , fieldOnlineUUID, fieldOnlineName, fieldServiceId, tableName, fieldInGameProfileUuid
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(inGameUUID));
@@ -236,10 +252,10 @@ public class UserDataTableV3 {
      */
     public int setInGameUUID(UUID onlineUUID, int serviceId, UUID newInGameUUID) throws SQLException {
         String sql = String.format(
-                "UPDATE %s SET %s = ? WHERE %s = ? AND %s = ? LIMIT 1"
+                "UPDATE %s SET %s = ? WHERE %s = ? AND %s = ?"
                 , tableName, fieldInGameProfileUuid, fieldOnlineUUID, fieldServiceId
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(newInGameUUID));
@@ -260,7 +276,7 @@ public class UserDataTableV3 {
                 "SELECT 1 FROM %s WHERE %s = ? AND %s = ? LIMIT 1"
                 , tableName, fieldOnlineUUID, fieldServiceId
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(onlineUUID));
@@ -284,7 +300,7 @@ public class UserDataTableV3 {
                 "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?) "
                 , tableName, fieldOnlineUUID, fieldServiceId, fieldOnlineName, fieldInGameProfileUuid
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(onlineUUID));
@@ -308,10 +324,10 @@ public class UserDataTableV3 {
      */
     public void setWhitelist(UUID onlineUUID, int serviceId, boolean whitelist) throws SQLException {
         String sql = String.format(
-                "UPDATE %s SET %s = ? WHERE %s = ? AND %s = ? LIMIT 1"
+                "UPDATE %s SET %s = ? WHERE %s = ? AND %s = ?"
                 , tableName, fieldWhitelist, fieldOnlineUUID, fieldServiceId
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBoolean(1, whitelist);
@@ -329,7 +345,7 @@ public class UserDataTableV3 {
                 "SELECT %s FROM %s WHERE %s = ? AND %s = ? LIMIT 1"
                 , fieldWhitelist, tableName, fieldOnlineUUID, fieldServiceId
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(onlineUUID));
@@ -348,20 +364,17 @@ public class UserDataTableV3 {
      */
     public boolean hasWhitelist(UUID inGameUUID) throws SQLException {
         String sql = String.format(
-                "SELECT %s FROM %s WHERE %s = ? LIMIT 1"
-                , fieldWhitelist, tableName, fieldInGameProfileUuid
+                "SELECT 1 FROM %s WHERE %s = ? AND %s = true LIMIT 1"
+                , tableName, fieldInGameProfileUuid, fieldWhitelist
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(inGameUUID));
             try (ResultSet resultSet = statement.executeQuery()) {
-                if (resultSet.next()) {
-                    return resultSet.getBoolean(1);
-                }
+                return resultSet.next();
             }
         }
-        return false;
     }
 
     /**
@@ -369,10 +382,10 @@ public class UserDataTableV3 {
      */
     public void setWhitelist(UUID inGameUUID, boolean whitelist) throws SQLException {
         String sql = String.format(
-                "UPDATE %s SET %s = ? WHERE %s = ?LIMIT 1"
+                "UPDATE %s SET %s = ? WHERE %s = ?"
                 , tableName, fieldWhitelist, fieldInGameProfileUuid
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBoolean(1, whitelist);
@@ -395,7 +408,7 @@ public class UserDataTableV3 {
         );
         List<String> result = new ArrayList<>();
         try (
-            Connection connection = sqlManager.getPool().getConnection();
+            Connection connection = database.getConnection();
             PreparedStatement statement = connection.prepareStatement(sql);
             ResultSet resultSet = statement.executeQuery()
         ) {
@@ -423,10 +436,10 @@ public class UserDataTableV3 {
 
     public void setOnlineName(UUID onlineUUID, int serviceId, String onlineName) throws SQLException {
         String sql = String.format(
-                "UPDATE %s SET %s = ? WHERE %s = ? AND %s = ? LIMIT 1"
+                "UPDATE %s SET %s = ? WHERE %s = ? AND %s = ?"
                 , tableName, fieldOnlineName, fieldOnlineUUID, fieldServiceId
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setString(1, onlineName);
@@ -441,7 +454,7 @@ public class UserDataTableV3 {
                 "SELECT %s FROM %s WHERE %s = ? AND %s = ? LIMIT 1"
                 , fieldOnlineName, tableName, fieldOnlineUUID, fieldServiceId
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(onlineUUID));

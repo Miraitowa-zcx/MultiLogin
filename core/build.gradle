@@ -12,6 +12,23 @@ dependencies {
     compileOnly project(":flows")
     compileOnly 'org.geysermc.floodgate:api:2.2.2-SNAPSHOT'
     compileOnly 'org.geysermc.geyser:api:2.2.0-SNAPSHOT'
+
+    testImplementation project(':api')
+    testImplementation project(':flows')
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.spongepowered:configurate-yaml:4.1.2'
+    testImplementation 'com.zaxxer:HikariCP:5.0.1'
+    testImplementation 'com.h2database:h2:2.1.214'
+    testImplementation 'org.postgresql:postgresql:42.7.13'
+    testImplementation 'io.zonky.test:embedded-postgres:2.2.2'
+    testImplementation enforcedPlatform(
+            'io.zonky.test.postgres:embedded-postgres-binaries-bom:18.4.0')
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
 }
 
 shadowJar {
@@ -19,8 +36,8 @@ shadowJar {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 artifacts {

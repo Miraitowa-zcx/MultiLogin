@@ -1,6 +1,5 @@
 package fun.ksnb.multilogin.velocity.main;
 
-import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.connection.LoginEvent;
@@ -22,7 +21,7 @@ public class GlobalListener {
         multiLoginVelocity.getServer().getEventManager().register(multiLoginVelocity, this);
     }
 
-    @Subscribe(order = PostOrder.FIRST)
+    @Subscribe(priority = Short.MAX_VALUE - 1)
     public void onPlayerJoin(LoginEvent event) {
         HandleResult result = multiLoginVelocity.getMultiCoreAPI().getPlayerHandler().pushPlayerJoinGame(
                 event.getPlayer().getUniqueId(),
@@ -40,7 +39,7 @@ public class GlobalListener {
         multiLoginVelocity.getMultiCoreAPI().getPlayerHandler().callPlayerJoinGame(new VelocityPlayer(event.getPlayer()));
     }
 
-    @Subscribe(order = PostOrder.FIRST)
+    @Subscribe(priority = Short.MAX_VALUE - 1)
     public void onDisconnect(DisconnectEvent event) {
         multiLoginVelocity.getMultiCoreAPI().getPlayerHandler().pushPlayerQuitGame(
                 event.getPlayer().getUniqueId(),

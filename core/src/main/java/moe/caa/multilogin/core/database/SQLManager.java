@@ -6,6 +6,7 @@ import moe.caa.multilogin.core.configuration.SqlConfig;
 import moe.caa.multilogin.core.database.pool.H2ConnectionPool;
 import moe.caa.multilogin.core.database.pool.ISQLConnectionPool;
 import moe.caa.multilogin.core.database.pool.MysqlConnectionPool;
+import moe.caa.multilogin.core.database.pool.PostgreSqlConnectionPool;
 import moe.caa.multilogin.core.database.table.InGameProfileTableV3;
 import moe.caa.multilogin.core.database.table.SkinRestoredCacheTableV2;
 import moe.caa.multilogin.core.database.table.UserDataTableV3;
@@ -13,11 +14,12 @@ import moe.caa.multilogin.core.main.MultiCore;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 
 /**
  * 数据库管理程序
  */
-public class SQLManager {
+public class SQLManager implements SqlDatabase {
     @Getter
     private final MultiCore core;
     @Getter
@@ -36,39 +38,73 @@ public class SQLManager {
 
     public void init() throws SQLException, ClassNotFoundException {
         SqlConfig sqlConfig = core.getPluginConfig().getSqlConfig();
-        if (sqlConfig.getBackend() == SqlConfig.SqlBackend.MYSQL) {
-            pool = new MysqlConnectionPool(sqlConfig.getIp(), sqlConfig.getPort(), sqlConfig.getDatabase(),
-                    sqlConfig.getUsername(), sqlConfig.getPassword(),
-                    ValueUtil.isEmpty(sqlConfig.getConnectUrl()) ? MysqlConnectionPool.defaultUrl : sqlConfig.getConnectUrl()
-            );
-        } else if (sqlConfig.getBackend() == SqlConfig.SqlBackend.H2) {
-            pool = new H2ConnectionPool(core.getPlugin().getDataFolder(), sqlConfig.getUsername(), sqlConfig.getPassword(),
-                    ValueUtil.isEmpty(sqlConfig.getConnectUrl()) ? H2ConnectionPool.defaultUrl : sqlConfig.getConnectUrl()
-            );
-        } else {
-            throw new UnsupportedOperationException("Database type Unknown.");
-        }
-        String tablePrefix = sqlConfig.getTablePrefix() + '_';
+        String tablePrefix = SqlIdentifiers.tablePrefix(sqlConfig.getTablePrefix());
+        ISQLConnectionPool createdPool = null;
+        try {
+            createdPool = createPool(sqlConfig);
+            pool = createdPool;
 
-        final String inGameProfileTableNameV2 = tablePrefix + "in_game_profile_v2";
-        final String inGameProfileTableNameV3 = tablePrefix + "in_game_profile_v3";
-        final String userDataTableNameV2 = tablePrefix + "user_data_v2";
-        final String userDataTableNameV3 = tablePrefix + "user_data_v3";
-        final String skinRestorerCacheTableNameV2 = tablePrefix + "skin_restored_cache_v2";
-        userDataTable = new UserDataTableV3(this, userDataTableNameV3, userDataTableNameV2);
-        skinRestoredCacheTable = new SkinRestoredCacheTableV2(this, skinRestorerCacheTableNameV2);
-        inGameProfileTable = new InGameProfileTableV3(this, inGameProfileTableNameV3, inGameProfileTableNameV2);
+            final String inGameProfileTableNameV2 = tablePrefix + "in_game_profile_v2";
+            final String inGameProfileTableNameV3 = tablePrefix + "in_game_profile_v3";
+            final String userDataTableNameV2 = tablePrefix + "user_data_v2";
+            final String userDataTableNameV3 = tablePrefix + "user_data_v3";
+            final String skinRestorerCacheTableNameV2 = tablePrefix + "skin_restored_cache_v2";
+            userDataTable = new UserDataTableV3(this, userDataTableNameV3, userDataTableNameV2);
+            skinRestoredCacheTable = new SkinRestoredCacheTableV2(this, skinRestorerCacheTableNameV2);
+            inGameProfileTable = new InGameProfileTableV3(
+                    this, inGameProfileTableNameV3, inGameProfileTableNameV2);
 
-        try (Connection connection = getPool().getConnection()){
-            connection.setAutoCommit(false);
-            userDataTable.init(connection);
-            inGameProfileTable.init(connection);
-            skinRestoredCacheTable.init(connection);
-            connection.commit();
+            SqlSchemaInitializer.initialize(this, List.of(
+                    userDataTable,
+                    inGameProfileTable,
+                    skinRestoredCacheTable));
+        } catch (SQLException | ClassNotFoundException | RuntimeException | Error failure) {
+            if (createdPool != null) {
+                createdPool.close();
+            }
+            pool = null;
+            throw failure;
         }
+    }
+
+    private ISQLConnectionPool createPool(SqlConfig sqlConfig) throws ClassNotFoundException {
+        String configuredUrl = sqlConfig.getConnectUrl();
+        return switch (sqlConfig.getBackend()) {
+            case H2 -> new H2ConnectionPool(
+                    core.getPlugin().getDataFolder(),
+                    sqlConfig.getUsername(),
+                    sqlConfig.getPassword(),
+                    ValueUtil.isEmpty(configuredUrl) ? H2ConnectionPool.defaultUrl : configuredUrl);
+            case MYSQL -> new MysqlConnectionPool(
+                    sqlConfig.getIp(),
+                    sqlConfig.getPort(),
+                    sqlConfig.getDatabase(),
+                    sqlConfig.getUsername(),
+                    sqlConfig.getPassword(),
+                    ValueUtil.isEmpty(configuredUrl) ? MysqlConnectionPool.defaultUrl : configuredUrl);
+            case POSTGRESQL -> new PostgreSqlConnectionPool(
+                    sqlConfig.getIp(),
+                    sqlConfig.getPort(),
+                    sqlConfig.getDatabase(),
+                    sqlConfig.getUsername(),
+                    sqlConfig.getPassword(),
+                    ValueUtil.isEmpty(configuredUrl)
+                            ? PostgreSqlConnectionPool.defaultUrl
+                            : configuredUrl);
+        };
     }
 
     public void close() {
         if (pool != null) pool.close();
+    }
+
+    @Override
+    public Connection getConnection() throws SQLException {
+        return pool.getConnection();
+    }
+
+    @Override
+    public SqlDialect dialect() {
+        return pool.dialect();
     }
 }

@@ -37,6 +37,6 @@ public class SqlConfig {
     }
 
     public enum SqlBackend {
-        H2, MYSQL
+        H2, MYSQL, POSTGRESQL
     }
 }

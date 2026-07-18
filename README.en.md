@@ -12,6 +12,11 @@ _✨ Coexisting Minecraft Authentication and Multiple BlessingSkin Authenticatio
 
 </div>
 
+> [!IMPORTANT]
+> The original author has discontinued maintenance of this project.
+>
+> This version is independently developed and contributed to by [Miraitowa-zcx](https://github.com/Miraitowa-zcx) as a third-party developer. They are not an authorized maintainer, and this unofficial fork does not represent the original author or original project.
+
 ## Summary
 
 MultiLogin is a plugin designed primarily for Minecraft proxy,
@@ -29,10 +34,12 @@ allowing them to play together on the same server.
 
 ## Deploy
 
-The minimum requirement is' Java 17 ',
-without the need to install' authlib injector ',
-without any pre plugins,
-and without the need to add or change' JVM 'parameters
+The minimum requirement is `JDK 25` (the runtime must also use Java 25).
+No `authlib-injector`, prerequisite plugin, or extra JVM argument is required.
+
+The current Velocity target is the official `4.1.0-SNAPSHOT`. Builds follow the
+latest official 4.1 build by default, and runtime diagnostics report both the
+compile target and the running proxy version.
 
 1. [Download](https://github.com/CaaMoe/MultiLogin/releases/latest) plugin
 2. throw into plugins
@@ -45,9 +52,40 @@ See details in [Wiki](https://github.com/CaaMoe/MultiLogin/wiki)
 ## Build
 
 1. Clone this project
-2. Refer to [Description]（ https://github.com/CaaMoe/MultiLogin/blob/v6/velocity/libraries/README.md ）Complete the dependency on velocity
-3. Execute `./gradlew shadowJar`
-4. Find what you need under '*/build/libs'
+2. Use JDK 25 and execute `./gradlew shadowJar`
+3. Find the required artifact under `*/build/libs`
+
+The build resolves the latest official Velocity build by default. Pin a build
+for reproducible output when needed:
+
+```shell
+./gradlew shadowJar -PvelocityBuild=8
+```
+
+The verified official JAR and metadata are cached in `velocity/libraries`.
+Offline builds use the cache only after its SHA-256 and size pass verification;
+without a valid cache, the build fails instead of silently selecting another version.
+
+## Database
+
+`sql.backend` supports `H2`, `MYSQL`, and `POSTGRESQL`. H2 remains the default.
+PostgreSQL normally uses port `5432` and can use either the default URL template
+or an explicit URL:
+
+```yaml
+sql:
+  backend: 'POSTGRESQL'
+  ip: '127.0.0.1'
+  port: 5432
+  database: 'multilogin'
+  username: 'multilogin'
+  password: 'change-me'
+  connectUrl: 'jdbc:postgresql://{0}:{1}/{2}'
+```
+
+Changing the backend does not automatically migrate data between H2, MySQL, and
+PostgreSQL. Back up and import that data yourself. Existing V2-to-V3 upgrades
+within the selected backend remain transactional.
 
 ## BUG report
 

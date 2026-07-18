@@ -35,15 +35,15 @@ subprojects {
                 def line = scanner.nextLine()
                 if (line.trim().length() == 0 || (line.charAt(0) as String) == '#') continue
                 maven {
-                    url line
+                    url = line
                 }
             }
         }
     }
 
     dependencies {
-        compileOnly group: 'org.projectlombok', name: 'lombok', version: '1.18.38'
-        annotationProcessor group: 'org.projectlombok', name: 'lombok', version: '1.18.38'
+        compileOnly group: 'org.projectlombok', name: 'lombok', version: '1.18.46'
+        annotationProcessor group: 'org.projectlombok', name: 'lombok', version: '1.18.46'
 
         compileOnly("org.jetbrains:annotations:24.1.0")
         annotationProcessor("org.jetbrains:annotations:24.1.0")
@@ -106,7 +106,7 @@ subprojects {
     }
 
     compileJava {
-        sourceCompatibility = targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = targetCompatibility = JavaVersion.VERSION_25
     }
 }
 

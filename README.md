@@ -12,9 +12,10 @@ _✨ 正版与多种外置登录共存 ✨_
 
 </div>
 
-> [!CAUTION]
-> 🚧 本项目已停止维护, 因维护与问题修复成本过高, 不再建议继续使用.  
-> 可加入QQ交流群了解详细内幕和获取同类型需求的解决方案.
+> [!IMPORTANT]
+> 原作者已停止维护本项目。
+>
+> 当前版本由 [Miraitowa-zcx](https://github.com/Miraitowa-zcx) 同步到Velocity最新版本。其并非原作者授权的维护者，本非官方分支不代表原作者或原项目。
 
 ## 概述
 
@@ -30,7 +31,9 @@ MultiLogin 是一款主要为 Minecraft 代理端设计的插件，旨在实现�
 
 ## 安装
 
-最低需要 `Java 21`， 不需要安装 `authlib-injector` ，没有任何前置插件，也不需要添加和更改 `JVM` 参数
+最低需要 `JDK 25`（运行环境也必须是 Java 25）。不需要安装 `authlib-injector`，没有任何前置插件，也不需要添加和更改 JVM 参数。
+
+当前 Velocity 适配目标为官方 `4.1.0-SNAPSHOT`。构建默认跟随 PaperMC 官方最新的 4.1 构建；运行时会记录编译目标和实际代理版本。
 
 ~~把大象装进冰箱需要几步？~~
 
@@ -45,8 +48,33 @@ MultiLogin 是一款主要为 Minecraft 代理端设计的插件，旨在实现�
 ## 构建
 
 1. 克隆这个项目
-2. 执行 `./gradlew shadowJar` / `gradlew shadowJar`
+2. 使用 JDK 25 执行 `./gradlew shadowJar` / `gradlew shadowJar`
 3. 在 `*/build/libs` 下寻找你需要的
+
+Velocity 构建默认解析官方最新构建。若要得到可复现产物，可固定构建号，例如：
+
+```shell
+./gradlew shadowJar -PvelocityBuild=8
+```
+
+解析成功后，官方 JAR 与元数据缓存在 `velocity/libraries`。离线构建只会使用已通过 SHA-256 与大小校验的缓存；没有有效缓存时会明确失败，不会悄悄改用其他版本。
+
+## 数据库
+
+`sql.backend` 支持 `H2`、`MYSQL` 和 `POSTGRESQL`。H2 仍是默认值；PostgreSQL 通常使用端口 `5432`，可使用默认连接模板或显式设置：
+
+```yaml
+sql:
+  backend: 'POSTGRESQL'
+  ip: '127.0.0.1'
+  port: 5432
+  database: 'multilogin'
+  username: 'multilogin'
+  password: 'change-me'
+  connectUrl: 'jdbc:postgresql://{0}:{1}/{2}'
+```
+
+切换数据库后端不会自动搬迁已有数据。H2、MySQL 与 PostgreSQL 之间迁移时，请自行备份并导入数据；同一后端内已有 V2 表到 V3 表的升级仍由插件事务化完成。
 
 或者你也可以
 

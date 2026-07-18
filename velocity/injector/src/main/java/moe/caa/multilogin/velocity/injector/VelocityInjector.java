@@ -11,6 +11,8 @@ import moe.caa.multilogin.api.internal.logger.LoggerProvider;
 import moe.caa.multilogin.api.internal.main.MultiCoreAPI;
 import moe.caa.multilogin.api.internal.util.reflect.NoSuchEnumException;
 import moe.caa.multilogin.api.internal.util.reflect.ReflectUtil;
+import moe.caa.multilogin.velocity.injector.compat.VelocityCompatibilityException;
+import moe.caa.multilogin.velocity.injector.compat.VelocityInternals;
 import moe.caa.multilogin.velocity.injector.handler.MultiInitialLoginSessionHandler;
 import moe.caa.multilogin.velocity.injector.redirect.auth.MultiEncryptionResponse;
 import moe.caa.multilogin.velocity.injector.redirect.auth.MultiServerLogin;
@@ -33,12 +35,42 @@ public class VelocityInjector implements Injector {
 
     @Override
     public void inject(MultiCoreAPI multiCoreAPI) throws NoSuchFieldException, ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, NoSuchEnumException {
-        MultiInitialLoginSessionHandler.init();
-        // auth
-        {
-            StateRegistry.PacketRegistry serverbound = getServerboundPacketRegistry(StateRegistry.LOGIN);
-            redirectInput(serverbound, EncryptionResponsePacket.class, () -> new MultiEncryptionResponse(multiCoreAPI));
-            redirectInput(serverbound, ServerLoginPacket.class, () -> new MultiServerLogin(multiCoreAPI));
+        VelocityInternals internals = VelocityInternals.resolve();
+        StateRegistry.PacketRegistry serverbound = getServerboundPacketRegistry(StateRegistry.LOGIN);
+
+        verifyInputRedirect(serverbound, EncryptionResponsePacket.class);
+        verifyInputRedirect(serverbound, ServerLoginPacket.class);
+
+        redirectInput(
+                serverbound,
+                EncryptionResponsePacket.class,
+                () -> new MultiEncryptionResponse(multiCoreAPI, internals));
+        redirectInput(serverbound, ServerLoginPacket.class, () -> new MultiServerLogin(multiCoreAPI));
+        LoggerProvider.getLogger().info("Velocity 4.1 internal compatibility verified");
+    }
+
+    private <T> void verifyInputRedirect(
+            StateRegistry.PacketRegistry bound,
+            Class<T> originalClass) throws NoSuchFieldException, IllegalAccessException {
+        Field suppliersField = StateRegistry.PacketRegistry.ProtocolRegistry.class
+                .getDeclaredField("packetIdToSupplier");
+        ReflectUtil.handleAccessible(suppliersField);
+
+        boolean found = false;
+        for (Object protocolRegistry : getProtocolRegistries(bound)) {
+            Map<?, ?> packetIdToSupplier = (Map<?, ?>) suppliersField.get(protocolRegistry);
+            for (Object supplier : packetIdToSupplier.values()) {
+                MinecraftPacket packet = (MinecraftPacket) ((Supplier<?>) supplier).get();
+                if (packet.getClass().equals(originalClass)) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) {
+            throw new VelocityCompatibilityException(
+                    "Missing Velocity internal packet registry contract for "
+                            + originalClass.getName());
         }
     }
 

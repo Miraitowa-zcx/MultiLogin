@@ -15,8 +15,8 @@ dependencies {
 
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 processResources {
@@ -177,7 +177,7 @@ static void check(byte[] bytes, String mainClass) {
 }
 
 static byte[] getBytes(def url) {
-    def httpURLConnection = (HttpURLConnection) new URL(url).openConnection()
+    def httpURLConnection = (HttpURLConnection) new URI(url).toURL().openConnection()
     httpURLConnection.setDoInput(true)
     httpURLConnection.setDoOutput(false)
     httpURLConnection.connect()

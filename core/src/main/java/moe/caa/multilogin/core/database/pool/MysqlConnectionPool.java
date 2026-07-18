@@ -2,6 +2,7 @@ package moe.caa.multilogin.core.database.pool;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import moe.caa.multilogin.core.database.SqlDialect;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -36,6 +37,11 @@ public class MysqlConnectionPool implements ISQLConnectionPool {
     @Override
     public String name() {
         return "MySQL";
+    }
+
+    @Override
+    public SqlDialect dialect() {
+        return SqlDialect.MYSQL;
     }
 
     @Override

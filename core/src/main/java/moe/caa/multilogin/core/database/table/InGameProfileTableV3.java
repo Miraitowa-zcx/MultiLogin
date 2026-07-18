@@ -3,39 +3,50 @@ package moe.caa.multilogin.core.database.table;
 import moe.caa.multilogin.api.internal.logger.LoggerProvider;
 import moe.caa.multilogin.api.internal.util.Pair;
 import moe.caa.multilogin.api.internal.util.ValueUtil;
-import moe.caa.multilogin.core.database.SQLManager;
+import moe.caa.multilogin.core.database.SqlDatabase;
+import moe.caa.multilogin.core.database.SqlDialect;
+import moe.caa.multilogin.core.database.SqlTable;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.MessageFormat;
 import java.util.*;
 
-public class InGameProfileTableV3 {
+public class InGameProfileTableV3 implements SqlTable {
     private static final String fieldInGameUuid = "in_game_uuid";
     private static final String fieldCurrentUsernameLowerCase = "current_username_lower_case";
     private static final String fieldCurrentUsernameOriginal = "current_username_original";
     private final String tableName;
     private final String tableNameV2;
-    private final SQLManager sqlManager;
+    private final SqlDatabase database;
 
-    public InGameProfileTableV3(SQLManager sqlManager, String tableName, String tableNameV2) {
+    public InGameProfileTableV3(SqlDatabase database, String tableName, String tableNameV2) {
         this.tableName = tableName;
-        this.sqlManager = sqlManager;
+        this.database = database;
         this.tableNameV2 = tableNameV2;
     }
 
 
+    @Override
     public void init(Connection connection) throws SQLException {
-        String sql = MessageFormat.format(
-                "CREATE TABLE IF NOT EXISTS {0} ( " +
-                        "{1} BINARY(16) NOT NULL, " +
-                        "{2} VARCHAR(64) DEFAULT NULL, " +
-                        "{3} VARCHAR(64) DEFAULT NULL, " +
-                        "CONSTRAINT IGPT_V3_PR PRIMARY KEY ( {1} ), " +
-                        "CONSTRAINT IGPT_V3_UN UNIQUE ( {2} ))"
-                , tableName, fieldInGameUuid, fieldCurrentUsernameLowerCase, fieldCurrentUsernameOriginal);
+        SqlDialect dialect = database.dialect();
+        String binaryCheck = dialect.binaryCheck(fieldInGameUuid, 16);
+        String sql = String.format(
+                "CREATE TABLE IF NOT EXISTS %s ( "
+                        + "%s %s NOT NULL%s, "
+                        + "%s VARCHAR(64) DEFAULT NULL, "
+                        + "%s VARCHAR(64) DEFAULT NULL, "
+                        + "PRIMARY KEY ( %s ), "
+                        + "UNIQUE ( %s ))",
+                tableName,
+                fieldInGameUuid,
+                dialect.binaryType(16),
+                binaryCheck.isEmpty() ? "" : " " + binaryCheck,
+                fieldCurrentUsernameLowerCase,
+                fieldCurrentUsernameOriginal,
+                fieldInGameUuid,
+                fieldCurrentUsernameLowerCase);
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
             preparedStatement.executeUpdate();
             // 查新表有没有数据，没有的话就尝试一下数据升级
@@ -49,6 +60,9 @@ public class InGameProfileTableV3 {
                     return;
                 }
             }
+            if (!SqlTableMetadata.tableExists(connection, tableNameV2)) {
+                return;
+            }
             try (
                     PreparedStatement statement = connection.prepareStatement("SELECT COUNT(0) FROM " + tableNameV2);
                     ResultSet resultSet = statement.executeQuery()
@@ -58,9 +72,6 @@ public class InGameProfileTableV3 {
                     // 老表里面没有数据，不需要升级
                     return;
                 }
-            } catch (Exception ignored) {
-                // 老表不存在，不需要进行升级
-                return;
             }
         }
 
@@ -92,7 +103,7 @@ public class InGameProfileTableV3 {
                 "SELECT %s FROM %s WHERE %s = ? LIMIT 1"
                 , fieldCurrentUsernameOriginal, tableName, fieldInGameUuid
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(inGameUUID));
@@ -117,7 +128,7 @@ public class InGameProfileTableV3 {
                 "SELECT %s FROM %s WHERE LOWER(%s) = ? LIMIT 1"
                 , fieldInGameUuid, tableName, fieldCurrentUsernameLowerCase
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setString(1, currentUsername.toLowerCase(Locale.ROOT));
@@ -141,7 +152,7 @@ public class InGameProfileTableV3 {
                 "SELECT 1 FROM %s WHERE %s = ? LIMIT 1"
                 , tableName, fieldInGameUuid
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(inGameUUID));
@@ -161,7 +172,7 @@ public class InGameProfileTableV3 {
                 "SELECT %s FROM %s WHERE %s = ? LIMIT 1"
                 , fieldCurrentUsernameOriginal, tableName, fieldInGameUuid
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(inGameUUID));
@@ -186,7 +197,7 @@ public class InGameProfileTableV3 {
                 "UPDATE %s SET %s = ?, %s = ? WHERE %s = ?"
                 , tableName, fieldCurrentUsernameLowerCase, fieldCurrentUsernameOriginal, fieldInGameUuid
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setString(1, currentUsername.toLowerCase(Locale.ROOT));
@@ -206,7 +217,7 @@ public class InGameProfileTableV3 {
                 "INSERT INTO %s (%s, %s, %s) VALUES (?, ?, ?)"
                 , tableName, fieldInGameUuid, fieldCurrentUsernameLowerCase, fieldCurrentUsernameOriginal
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             connection.setAutoCommit(false);
@@ -223,7 +234,7 @@ public class InGameProfileTableV3 {
                 "DELETE FROM %s WHERE %s = ?"
                 , tableName, fieldInGameUuid
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setBytes(1, ValueUtil.uuidToBytes(uuid));
@@ -241,7 +252,7 @@ public class InGameProfileTableV3 {
                 "UPDATE %s SET %s = ?, %s = ? WHERE LOWER(%s) = ?"
                 , tableName, fieldCurrentUsernameLowerCase, fieldCurrentUsernameOriginal, fieldCurrentUsernameLowerCase
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setString(1, null);
@@ -256,7 +267,7 @@ public class InGameProfileTableV3 {
                 "UPDATE %s SET %s = ?, %s = ?"
                 , tableName, fieldCurrentUsernameLowerCase, fieldCurrentUsernameOriginal
         );
-        try (Connection connection = sqlManager.getPool().getConnection();
+        try (Connection connection = database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)
         ) {
             statement.setString(1, null);

@@ -3,7 +3,6 @@ package fun.ksnb.multilogin.velocity.main;
 import com.google.inject.Inject;
 import com.velocitypowered.api.event.AwaitingEventExecutor;
 import com.velocitypowered.api.event.EventTask;
-import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.connection.PostLoginEvent;
@@ -56,6 +55,16 @@ public class MultiLoginVelocity implements IPlugin {
         this.runServer = new VelocityServer(this.server);
         this.dataDirectory = dataDirectory;
         LoggerProvider.setLogger(new Slf4jLoggerBridge(logger));
+        VelocityTarget target = VelocityTarget.load();
+        String runningVersion = server.getVersion().getVersion();
+        LoggerProvider.getLogger().info(
+                "MultiLogin compiled against " + target.displayName()
+                        + ", running on Velocity " + runningVersion);
+        if (!runningVersion.equals(target.version())) {
+            LoggerProvider.getLogger().warn(
+                    "Velocity runtime version differs from the verified compile target; "
+                            + "the internal compatibility probe will decide whether startup is safe.");
+        }
         this.pluginLoader = new PluginLoader(this);
         try {
             pluginLoader.load("MultiLogin-Velocity-Injector.JarFile");
@@ -92,7 +101,10 @@ public class MultiLoginVelocity implements IPlugin {
                         }
                     })
             );
-            server.getEventManager().register(this, DisconnectEvent.class, PostOrder.LAST,
+            server.getEventManager().register(
+                    this,
+                    DisconnectEvent.class,
+                    (short) (Short.MIN_VALUE + 1),
                     (AwaitingEventExecutor<DisconnectEvent>) disconnectEvent ->
                             disconnectEvent.getLoginStatus() == DisconnectEvent.LoginStatus.CONFLICTING_LOGIN
                                     ? null

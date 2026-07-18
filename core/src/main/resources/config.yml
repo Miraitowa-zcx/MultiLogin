@@ -75,6 +75,9 @@ sql:
   # 请使用以下值:
   #   H2
   #   MYSQL
+  #   POSTGRESQL
+  #
+  # 更换 backend 不会自动迁移已有 H2/MySQL/PostgreSQL 数据。
   # 默认值 ‘H2’
   backend: 'H2'
 
@@ -85,6 +88,7 @@ sql:
 
   # 端口
   #
+  # PostgreSQL 通常使用 5432；H2 默认配置不会使用此项。
   # 默认值 ‘3306’
   port: 3306
 
@@ -112,5 +116,8 @@ sql:
 
   # 高级设定，指定连接 URL
   #
+  # PostgreSQL 示例（同时将 backend 改为 POSTGRESQL、port 改为 5432）：
+  # connectUrl: 'jdbc:postgresql://{0}:{1}/{2}'
+  # {0}/{1}/{2} 会分别替换为 ip/port/database；留空则使用对应后端默认值。
   # 默认值 ’‘
   connectUrl: ''

@@ -9,7 +9,7 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
 import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
-import java.net.URL;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.UUID;
@@ -165,7 +165,8 @@ public class MetricsLite {
         pluginData.add(getPluginData());
 
         data.add("plugins", pluginData);
-        HttpsURLConnection connection = (HttpsURLConnection) new URL("https://bStats.org/submitData/bukkit").openConnection();
+        HttpsURLConnection connection = (HttpsURLConnection) URI.create(
+                "https://bStats.org/submitData/bukkit").toURL().openConnection();
 
         // 压缩数据发送
         byte[] compressedData = compress(data.toString());
