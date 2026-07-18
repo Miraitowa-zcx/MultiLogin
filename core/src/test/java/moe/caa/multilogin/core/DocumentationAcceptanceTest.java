@@ -27,4 +27,23 @@ class DocumentationAcceptanceTest {
                     () -> "Documentation is missing required token: " + required);
         }
     }
+
+    @Test
+    void documentsSecureChatMixedModeAndSupportedClientRange() throws Exception {
+        Path root = Path.of("..").toAbsolutePath().normalize();
+        String chinese = Files.readString(root.resolve("README.md"));
+        String english = Files.readString(root.resolve("README.en.md"));
+
+        for (String documentation : new String[]{chinese, english}) {
+            for (String required : new String[]{
+                    "enforce-secure-profile=false",
+                    "1.21.x",
+                    "26.x",
+                    "modern forwarding"
+            }) {
+                assertTrue(documentation.contains(required),
+                        () -> "Secure chat documentation is missing required token: " + required);
+            }
+        }
+    }
 }

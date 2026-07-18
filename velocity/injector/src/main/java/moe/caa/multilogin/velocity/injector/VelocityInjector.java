@@ -1,6 +1,8 @@
 package moe.caa.multilogin.velocity.injector;
 
 import com.velocitypowered.api.network.ProtocolVersion;
+import com.velocitypowered.proxy.connection.MinecraftSessionHandler;
+import com.velocitypowered.proxy.connection.client.ClientPlaySessionHandler;
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
 import com.velocitypowered.proxy.protocol.StateRegistry;
 import com.velocitypowered.proxy.protocol.packet.EncryptionResponsePacket;
@@ -32,10 +34,11 @@ import static com.velocitypowered.api.network.ProtocolVersion.SUPPORTED_VERSIONS
  * Velocity 注入程序
  */
 public class VelocityInjector implements Injector {
+    private VelocityInternals internals;
 
     @Override
     public void inject(MultiCoreAPI multiCoreAPI) throws NoSuchFieldException, ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, NoSuchEnumException {
-        VelocityInternals internals = VelocityInternals.resolve();
+        internals = VelocityInternals.resolve();
         StateRegistry.PacketRegistry serverbound = getServerboundPacketRegistry(StateRegistry.LOGIN);
 
         verifyInputRedirect(serverbound, EncryptionResponsePacket.class);
@@ -75,6 +78,10 @@ public class VelocityInjector implements Injector {
     }
 
     public void registerChatSession(Map<Integer,Integer> packetMapping) {
+        if (internals == null) {
+            throw new VelocityCompatibilityException(
+                    "Velocity internals must be resolved before chat session registration");
+        }
         // chat
         try {
             StateRegistry.PacketRegistry serverbound = getServerboundPacketRegistry(StateRegistry.PLAY);
@@ -84,11 +91,23 @@ public class VelocityInjector implements Injector {
                 LoggerProvider.getLogger().debug("Register PlayerSessionPacketBlocker for protocol version: " + entry.getKey());
                 playerSessionPacketMapping.add(createPacketMapping(entry.getValue(), ProtocolVersion.getProtocolVersion(entry.getKey()), false));
             }
-            registerPacket(serverbound, PlayerSessionPacketBlocker.class, PlayerSessionPacketBlocker::new, playerSessionPacketMapping.toArray(new StateRegistry.PacketMapping[0]));
+            registerPacket(
+                    serverbound,
+                    PlayerSessionPacketBlocker.class,
+                    () -> new PlayerSessionPacketBlocker(this::resolveFinalProfileId),
+                    playerSessionPacketMapping.toArray(new StateRegistry.PacketMapping[0]));
 
         } catch (Throwable throwable){
             LoggerProvider.getLogger().error("Unable to register PlayerSessionPacketBlocker, chat session blocker does not work as expected.", throwable);
         }
+    }
+
+    private UUID resolveFinalProfileId(MinecraftSessionHandler handler) {
+        if (!(handler instanceof ClientPlaySessionHandler clientPlayHandler)) {
+            throw new VelocityCompatibilityException(
+                    "ChatSessionUpdate was handled outside ClientPlaySessionHandler");
+        }
+        return internals.player(clientPlayHandler).getUniqueId();
     }
 
     private StateRegistry.PacketRegistry getServerboundPacketRegistry(StateRegistry stateRegistry) throws NoSuchFieldException, IllegalAccessException {

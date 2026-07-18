@@ -45,6 +45,7 @@ public class MapperConfig implements MapperConfigAPI {
             put(765,0x07);
             put(768,0x08);
             put(771,0x09);
+            put(775,0x0A);
         }
     };
 

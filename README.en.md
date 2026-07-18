@@ -15,7 +15,7 @@ _✨ Coexisting Minecraft Authentication and Multiple BlessingSkin Authenticatio
 > [!IMPORTANT]
 > The original author has discontinued maintenance of this project.
 >
-> This version is independently developed and contributed to by [Miraitowa-zcx](https://github.com/Miraitowa-zcx) as a third-party developer. They are not an authorized maintainer, and this unofficial fork does not represent the original author or original project.
+> This version is independently developed and contributed to by [Miraitowa-zcx](https://github.com/Miraitowa-zcx). They are not an authorized maintainer, and this unofficial fork does not represent the original author or original project.
 
 ## Summary
 
@@ -48,6 +48,12 @@ compile target and the running proxy version.
 ## Config
 
 See details in [Wiki](https://github.com/CaaMoe/MultiLogin/wiki)
+
+## Secure chat compatibility
+
+This fork supports Minecraft `1.21.x` through `26.x`. When premium and offline identities coexist, every downstream Paper server must set `enforce-secure-profile=false`. This only makes a Mojang-signed profile key optional: premium players whose key matches the final profile UUID retain native signed chat, while offline players or identities switched to a different UUID automatically fall back to unsigned chat.
+
+Keep Velocity `modern forwarding` enabled between the proxy and downstream servers, and isolate downstream server ports with a firewall or private network so players cannot bypass the proxy.
 
 ## Build
 

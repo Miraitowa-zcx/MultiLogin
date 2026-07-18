@@ -45,6 +45,12 @@ MultiLogin 是一款主要为 Minecraft 代理端设计的插件，旨在实现�
 
 详见 [Wiki](https://github.com/CaaMoe/MultiLogin/wiki)
 
+## 安全聊天兼容
+
+本分支支持 Minecraft `1.21.x` 至 `26.x`。在正版与离线身份混合使用时，所有下游 Paper 服务器必须设置 `enforce-secure-profile=false`。该设置只是不强制每位玩家提供 Mojang 签名的档案公钥：公钥与最终档案 UUID 匹配的正版玩家仍保留原生签名聊天；离线玩家或切换到不同 UUID 的身份会自动降级为未签名聊天。
+
+代理与下游服务器之间必须继续使用 Velocity `modern forwarding`，并通过防火墙或内网隔离下游服务器端口，避免玩家绕过代理直接连接。
+
 ## 构建
 
 1. 克隆这个项目

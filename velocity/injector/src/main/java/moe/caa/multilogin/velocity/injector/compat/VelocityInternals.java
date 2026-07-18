@@ -4,6 +4,8 @@ import com.velocitypowered.api.util.GameProfile;
 import com.velocitypowered.proxy.VelocityServer;
 import com.velocitypowered.proxy.connection.MinecraftConnection;
 import com.velocitypowered.proxy.connection.client.AuthSessionHandler;
+import com.velocitypowered.proxy.connection.client.ClientPlaySessionHandler;
+import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.connection.client.InitialLoginSessionHandler;
 import com.velocitypowered.proxy.connection.client.LoginInboundConnection;
 import com.velocitypowered.proxy.protocol.packet.ServerLoginPacket;
@@ -30,6 +32,7 @@ public final class VelocityInternals {
     private final MethodHandle getServer;
     private final MethodHandle getInbound;
     private final MethodHandle getMinecraftConnection;
+    private final MethodHandle getClientPlayPlayer;
     private final MethodHandle authSessionConstructor;
     private final Enum<?> loginPacketExpected;
     private final Enum<?> loginPacketReceived;
@@ -44,6 +47,7 @@ public final class VelocityInternals {
             MethodHandle getServer,
             MethodHandle getInbound,
             MethodHandle getMinecraftConnection,
+            MethodHandle getClientPlayPlayer,
             MethodHandle authSessionConstructor,
             Enum<?> loginPacketExpected,
             Enum<?> loginPacketReceived,
@@ -56,6 +60,7 @@ public final class VelocityInternals {
         this.getServer = getServer;
         this.getInbound = getInbound;
         this.getMinecraftConnection = getMinecraftConnection;
+        this.getClientPlayPlayer = getClientPlayPlayer;
         this.authSessionConstructor = authSessionConstructor;
         this.loginPacketExpected = loginPacketExpected;
         this.loginPacketReceived = loginPacketReceived;
@@ -81,6 +86,10 @@ public final class VelocityInternals {
                     handlerClass,
                     "mcConnection",
                     MinecraftConnection.class);
+            Field clientPlayPlayer = resolveField(
+                    ClientPlaySessionHandler.class,
+                    "player",
+                    ConnectedPlayer.class);
 
             Constructor<AuthSessionHandler> authConstructor =
                     AuthSessionHandler.class.getDeclaredConstructor(
@@ -102,6 +111,7 @@ public final class VelocityInternals {
                     lookup.unreflectGetter(server),
                     lookup.unreflectGetter(inbound),
                     lookup.unreflectGetter(connection),
+                    lookup.unreflectGetter(clientPlayPlayer),
                     lookup.unreflectConstructor(authConstructor),
                     resolveState(loginStateClass, "LOGIN_PACKET_EXPECTED"),
                     resolveState(loginStateClass, "LOGIN_PACKET_RECEIVED"),
@@ -141,6 +151,10 @@ public final class VelocityInternals {
 
     public byte[] verifyToken(InitialLoginSessionHandler handler) {
         return invokeGetter(getVerify, handler, byte[].class, "verify");
+    }
+
+    public ConnectedPlayer player(ClientPlaySessionHandler handler) {
+        return invokeGetter(getClientPlayPlayer, handler, ConnectedPlayer.class, "player");
     }
 
     public void assertState(InitialLoginSessionHandler handler, Enum<?> state) {
@@ -184,12 +198,16 @@ public final class VelocityInternals {
     }
 
     public String compatibilitySummary() {
-        return "Velocity 4.1 login states, fields, assertState, and five-argument "
-                + "AuthSessionHandler constructor resolved";
+        return "Velocity 4.1 login states, login and client-play fields, assertState, "
+                + "and five-argument AuthSessionHandler constructor resolved";
     }
 
     public MethodHandle authSessionConstructor() {
         return authSessionConstructor;
+    }
+
+    public MethodHandle clientPlayPlayerGetter() {
+        return getClientPlayPlayer;
     }
 
     public Enum<?> loginPacketExpected() {
@@ -263,11 +281,11 @@ public final class VelocityInternals {
 
     private static <T> T invokeGetter(
             MethodHandle getter,
-            InitialLoginSessionHandler handler,
+            Object owner,
             Class<T> expectedType,
             String description) {
         try {
-            return expectedType.cast(getter.invoke(handler));
+            return expectedType.cast(getter.invoke(owner));
         } catch (RuntimeException | Error failure) {
             throw failure;
         } catch (Throwable failure) {
